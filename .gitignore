@@ -9,7 +9,7 @@
 /logs
 /dataset.zip
 /scripts/__pycache__
-/*.txt
-/*.pkl
-/*.zip
-/*.csv
+*.txt
+*.pkl
+*.zip
+*.csv
