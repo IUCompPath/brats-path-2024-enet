@@ -1,0 +1,15 @@
+/.vscode
+/notes
+/__pycache__
+/dataset
+/data-split
+/checkpoints
+/extra
+/plots
+/logs
+/dataset.zip
+/scripts/__pycache__
+/*.txt
+/*.pkl
+/*.zip
+/*.csv
