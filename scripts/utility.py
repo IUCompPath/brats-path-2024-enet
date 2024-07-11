@@ -36,11 +36,11 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
         self.f1_max = f1
 
-def create_paths_list(train_data_path):#, val_data_path):
+def create_paths_list(data_folder_path):#, val_data_path):
     paths_list = []
-    train_classes = os.listdir(train_data_path)
+    train_classes = os.listdir(data_folder_path)
     for cls in train_classes:
-        class_path = os.path.join(train_data_path, cls)
+        class_path = os.path.join(data_folder_path, cls)
         image_names = os.listdir(class_path)
         for image_name in image_names:
             paths_list.append(os.path.join(class_path, image_name))

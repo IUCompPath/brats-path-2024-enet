@@ -1,40 +1,97 @@
-import os
+import argparse
+from tqdm import tqdm
+import pandas as pd
+import pickle
 
 # Torch Imports
 import torch
 from torch.utils.data import DataLoader
-import torch.nn as nn
-import torch.optim as optim
+import torch.nn.functional as nn
+from torchvision.transforms import v2
 from efficientnet_pytorch import EfficientNet
 
 # Local Imports
-from dataset import GBMPathDataset
-from utility import run_epoch, plot_cm
+from scripts.dataset import GBMPathDataset
+from utility import run_epoch
 import constants as C
 
+if __name__ == '__main__':
+    # Get arguments
+    parser = argparse.ArgumentParser(
+        description='This script trains the model'
+    )
+    parser.add_argument('--run_id',
+                        help='Exp No.',
+                        default=0,
+                        type=int)
+    parser.add_argument('--run_file',
+                        help = 'Path to pickle file with arguments',
+                        default=7,
+                        type=int)
+    parser.add_argument('--chkpt_file',
+                        help='Checkpoint File Name',
+                        default="checkpoint.pt",
+                        type=str)
+    parser.add_argument("--batch_size",
+                        help='Batch Size',
+                        default=32,
+                        type=int)
+    parser.add_argument('--csv_path',
+                        help='Predictions CSV Path',
+                        default="./predictions_csv",
+                        type=tuple)
+    args = parser.parse_args()
+
+with open(args.run_file, 'rb') as f:
+    model_dict = pickle.load(f)
+
+def run_epoch(dataloader,
+              model,
+              device):
+
+    path_list = []
+    pred_list = []
+
+    for path, x in tqdm(dataloader):
+
+        # Moving input to device
+        x = x.to(device)
+
+        # Running forward propagation
+        y_hat = model(x)
+
+        prob = nn.softmax(y_hat, dim=1)
+        _, pred_class = torch.max(prob, dim=1)
+
+        path_list.extend(path)
+        pred_list.extend(pred_class)
+
+    return path_list, pred_list
+
+
 # Load Test data
+test_transforms = v2.Compose([
+    v2.ToImage(),
+    v2.Resize(size=model_dict["image_size"]),
+    v2.ToDtype(torch.float, scale=True),
+])
+
 test_dataset = GBMPathDataset(
-    imgs_path_prefix=C.IMAGES_PATH_PREFIX,
     imgs_path_file=C.TEST_IMAGES_PATHS,
+    transforms=test_transforms
 )
 
 test_dataloader = DataLoader(
     test_dataset,
-    batch_size=C.test_batch_size,
-    shuffle=False,
-    num_workers=2
+    batch_size=args.batch_size,
+    shuffle=False
 )
 
-model = EfficientNet.from_name('efficientnet-b4', num_classes=C.N_CLASSES)
-opt = optim.Adam(model.parameters(), lr=C.lr, weight_decay=C.lmbda)
+model = EfficientNet.from_name(f'efficientnet-b{model_dict["enet_model"]}', num_classes=C.N_CLASSES)
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-# Define weighted cross-entropy loss
-loss_fn = nn.CrossEntropyLoss()
-
 # Load model
-CHECKPOINT_FILE = f"checkpoint.pt"
-CHECKPOINT_PATH = f"./checkpoints/{C.RUN_ID}/{CHECKPOINT_FILE}"
+CHECKPOINT_PATH = f"./checkpoints/{args.run_id}/{args.chkpt_file}"
 checkpoint = torch.load(CHECKPOINT_PATH)
 # Load pre-trained weights
 model.load_state_dict(checkpoint)
@@ -44,29 +101,14 @@ model = model.to(device)
 # Testing
 model.eval()
 
-test_metrics = run_epoch(
+path_list, pred_list = run_epoch(
     test_dataloader,
     model,
-    device,
-    loss_fn)
+    device)
 
-# Plot Confusion Matrix
-plot_cm(test_metrics[6], C.PLOTS_PATH, "test.png")
+pred_df = pd.DataFrame(
+    {'SubjectID': path_list,
+     'Prediction': pred_list
+    })
 
-print(
-        f"Test: Loss - {test_metrics[0]}, " +
-        f"Accuracy - {test_metrics[1]}, " +
-        f"Specificity - {test_metrics[2].mean()}, " +
-        f"Precision - {test_metrics[3].mean()}, " +
-        f"Recall - {test_metrics[4].mean()}, " +
-        f"F1 - {test_metrics[5].mean()}"
-    )
-
-for i in range(C.N_CLASSES):
-    print(
-        f"Class-{i}\n\t" +
-        f"Specificity - {test_metrics[2][i]}, " +
-        f"Precision - {test_metrics[3][i]}, " +
-        f"Recall - {test_metrics[4][i]}, " +
-        f"F1 - {test_metrics[5][i]}"
-    )
+pred_df.to_csv(f'{args.csv_path}/{args.run_id}_test_preds.csv', encoding='utf-8', index=False)

@@ -1,5 +1,6 @@
 import os
 import argparse
+import pickle
 
 # Torch Imports
 import torch
@@ -53,14 +54,17 @@ if __name__ == '__main__':
                         default=1e-4,
                         type=float)
     parser.add_argument('--early_stop',
-                        help='Early Stopping',
+                        help='Early Stopping- set if true',
                         default=True,
                         action='store_true')
     parser.add_argument("--patience",
                         help='Early Stopping Patience',
-                        default=15,
+                        default=20,
                         type=int)
     args = parser.parse_args()
+
+with open(f'run_args/{args.run_id}_args.pkl', 'wb') as f:
+    pickle.dump(args.__dict__, f)
 
 CKPT_PATH = os.path.join("./checkpoints/", f'{args.run_id}')
 LOG_PATH = os.path.join("./logs", f'{args.run_id}')
@@ -83,7 +87,7 @@ for cls in C.CLASS_NAMES:
 total_samples = sum(CLASS_COUNTS)
 class_weights = [total_samples / count for count in CLASS_COUNTS]
 class_weights = torch.tensor(class_weights, dtype=torch.float)
-class_weights = C.class_weights.to(device)
+class_weights = class_weights.to(device)
 # Define weighted cross-entropy loss
 loss_fn = nn.CrossEntropyLoss(weight=class_weights)
 
@@ -116,8 +120,7 @@ train_dataset = GBMPathDataset(
 )
 train_dataloader = DataLoader(train_dataset,
                             batch_size=args.batch_size,
-                            shuffle=True,
-                            num_workers=2)
+                            shuffle=True)
 
 # Load validation data
 # val_transforms = v2.Compose([
