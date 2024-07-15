@@ -7,6 +7,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import constants as C
+import pickle
 
 # Early stopping
 class EarlyStopping:
@@ -36,7 +37,7 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
         self.f1_max = f1
 
-def create_paths_list(data_folder_path):#, val_data_path):
+def create_paths_list(data_folder_path):
     paths_list = []
     train_classes = os.listdir(data_folder_path)
     for cls in train_classes:
@@ -44,14 +45,9 @@ def create_paths_list(data_folder_path):#, val_data_path):
         image_names = os.listdir(class_path)
         for image_name in image_names:
             paths_list.append(os.path.join(class_path, image_name))
-    # val_classes = os.listdir(val_data_path)
-    # for cls in val_classes:
-    #     class_path = os.path.join(val_data_path, cls)
-    #     image_names = os.listdir(class_path)
-    #     for image_name in image_names:
-    #         paths_list.append(os.path.join(class_path, image_name))
     random.shuffle(paths_list)
-    return paths_list
+    with open('image_paths/val.pkl', 'wb') as f:
+        pickle.dump(paths_list, f)
 
 def plot_cm(cm, path, file_name):
     # Plot Confusion Matrix
