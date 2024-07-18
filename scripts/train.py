@@ -99,19 +99,19 @@ model = model.to(device)
 # Load train data
 if args.transforms:
     train_transforms = v2.Compose([
-    v2.ToImage(),
-    v2.Resize(size=args.image_size),
-    v2.RandomRotation(degrees=20),
-    v2.RandomHorizontalFlip(),
-    v2.RandomVerticalFlip(),
-    v2.ColorJitter(brightness=0.1, contrast=0.1),
-    v2.ToDtype(torch.float, scale=True),
+        v2.ToImage(),
+        v2.Resize(size=args.image_size),
+        v2.RandomRotation(degrees=20),
+        v2.RandomHorizontalFlip(),
+        v2.RandomVerticalFlip(),
+        v2.ColorJitter(brightness=0.1, contrast=0.1),
+        v2.ToDtype(torch.float, scale=True),
     ])
 else:
     train_transforms = v2.Compose([
-    v2.ToImage(),
-    v2.Resize(size=args.image_size),
-    v2.ToDtype(torch.float, scale=True),
+        v2.ToImage(),
+        v2.Resize(size=args.image_size),
+        v2.ToDtype(torch.float, scale=True),
     ])
 train_dataset = GBMPathDataset(
     imgs_path_file=C.TRAIN_IMAGES_PATHS,
@@ -120,7 +120,8 @@ train_dataset = GBMPathDataset(
 )
 train_dataloader = DataLoader(train_dataset,
                             batch_size=args.batch_size,
-                            shuffle=True)
+                            shuffle=True,
+                            num_workers=2)
 
 # Load validation data
 val_transforms = v2.Compose([
@@ -130,11 +131,12 @@ val_transforms = v2.Compose([
 ])
 val_dataset = GBMPathDataset(
     imgs_path_file=C.VAL_IMAGES_PATHS,
-    func="train",
+    func="val",
     transforms=val_transforms)
 val_dataloader = DataLoader(val_dataset,
                             batch_size=args.batch_size,
-                            shuffle=True)
+                            shuffle=True,
+                            num_workers=2)
 
 # Logging model graph
 x, _ = next(iter(train_dataloader))
@@ -149,6 +151,7 @@ if args.early_stop:
 
 # Training
 for i in range(args.n_epochs):
+
     model.train()
     # run one epoch of training
     train_metrics = run_epoch(
@@ -196,14 +199,14 @@ for i in range(args.n_epochs):
 
     train_logger.add_scalar(f"epoch/loss", train_metrics[0], i)
     train_logger.add_scalar(f"epoch/accuracy", train_metrics[1], i)
-    train_logger.add_scalar(f"epoch/specificity", train_metrics[2].mean(), i)
+    # train_logger.add_scalar(f"epoch/specificity", train_metrics[2].mean(), i)
     train_logger.add_scalar(f"epoch/precision", train_metrics[3].mean(), i)
     train_logger.add_scalar(f"epoch/recall", train_metrics[4].mean(), i)
     train_logger.add_scalar(f"epoch/f1", train_metrics[5].mean(), i)
 
     val_logger.add_scalar(f"epoch/loss", val_metrics[0], i)
     val_logger.add_scalar(f"epoch/accuracy", val_metrics[1], i)
-    val_logger.add_scalar(f"epoch/specificity", val_metrics[2].mean(), i)
+    # val_logger.add_scalar(f"epoch/specificity", val_metrics[2].mean(), i)
     val_logger.add_scalar(f"epoch/precision", val_metrics[3].mean(), i)
     val_logger.add_scalar(f"epoch/recall", val_metrics[4].mean(), i)
     val_logger.add_scalar(f"epoch/f1", val_metrics[5].mean(), i)
@@ -213,19 +216,19 @@ for i in range(args.n_epochs):
             f"Val metrics for Class: {j}\n\t" +
             f"Precision - {val_metrics[3][j]}, " +
             f"Recall - {val_metrics[4][j]}, " +
-            f"F1 - {val_metrics[5][j]}, " +
-            f"Specificity - {val_metrics[2][j]}"
+            f"F1 - {val_metrics[5][j]}, "
+            # f"Specificity - {val_metrics[2][j]}"
         )
 
-        train_logger.add_scalar(f"precision/{j}", train_metrics[3][j], i)
-        train_logger.add_scalar(f"recall/{j}", train_metrics[4][j], i)
-        train_logger.add_scalar(f"f1/{j}", train_metrics[5][j], i)
-        train_logger.add_scalar(f"specificity/{j}", train_metrics[2][j], i)
+        train_logger.add_scalar(f"{j}/epoch/precision", train_metrics[3][j], i)
+        train_logger.add_scalar(f"{j}/epoch/recall", train_metrics[4][j], i)
+        train_logger.add_scalar(f"{j}/epoch/f1", train_metrics[5][j], i)
+        # train_logger.add_scalar(f"{j}/epoch/specificity/{j}", train_metrics[2][j], i)
 
-        val_logger.add_scalar(f"precision/{j}", val_metrics[3][j], i)
-        val_logger.add_scalar(f"recall/{j}", val_metrics[4][j], i)
-        val_logger.add_scalar(f"f1/{j}", val_metrics[5][j], i)
-        val_logger.add_scalar(f"specificity/{j}", val_metrics[2][j], i)
+        val_logger.add_scalar(f"{j}/epoch/precision", val_metrics[3][j], i)
+        val_logger.add_scalar(f"{j}/epoch/recall", val_metrics[4][j], i)
+        val_logger.add_scalar(f"{j}/epoch/f1", val_metrics[5][j], i)
+        # val_logger.add_scalar(f"{j}/epoch/specificity", val_metrics[2][j], i)
 
     # Check early stopping criteria
     if args.early_stop:
@@ -238,4 +241,5 @@ for i in range(args.n_epochs):
 
     torch.save(model.state_dict(), os.path.join(CKPT_PATH, f"checkpoint{i}.pt"))
 
+plot_cm(val_metrics[6], PLOTS_PATH, "val.png")
 plot_cm(train_metrics[6], PLOTS_PATH, "train.png")
