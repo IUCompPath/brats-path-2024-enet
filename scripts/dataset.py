@@ -28,10 +28,9 @@ class GBMPathDataset(Dataset):
         self.data = []
         with open(self.imgs_path_file, 'rb') as fp:
             all_paths = pickle.load(fp)
-        if self.func == "train":
-            np.random.shuffle(all_paths)
+
         for path in all_paths:
-            if self.func == "train":
+            if self.func != "test":
                 class_name = path.split("_")[1]
                 self.data.append((path, class_name))
             else:
@@ -45,7 +44,7 @@ class GBMPathDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        if self.func == "train":
+        if self.func != "test":
             img_path, class_name = self.data[idx]
             class_id = self.class_map[class_name]
         else:
@@ -53,7 +52,7 @@ class GBMPathDataset(Dataset):
         img = Image.open(img_path)
         if self.transforms:
             img = self.transforms(img)
-        if self.func == "train":
+        if self.func != "test":
             return img, class_id
         else:
             return img_path, img
