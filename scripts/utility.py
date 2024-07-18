@@ -84,15 +84,9 @@ def run_epoch(dataloader,
 
         # Running forward propagation
         y_hat = model(x)
+
         # Compute loss
         loss = loss_fn(y_hat, y)
-
-        # detach removes y_hat from the original computational graph which might be on gpu.
-        y_hat = y_hat.detach().cpu()
-        y = y.cpu()
-
-        y_list.append(y)
-        y_hat_list.append(y_hat)
 
         if opt is not None:
             # Make all gradients zero.
@@ -104,10 +98,18 @@ def run_epoch(dataloader,
             # Update parameters
             opt.step()
 
-        # Freeing up memory
-        del x
+        loss_val = loss.item()
 
-        loss_list.append(loss.item())
+        # Freeing up memory
+        del x, loss
+
+        # detach removes y_hat from the original computational graph which might be on gpu.
+        y_hat = y_hat.detach().cpu()
+        y = y.cpu()
+
+        y_list.append(y)
+        y_hat_list.append(y_hat)
+        loss_list.append(loss_val)
 
         # Compute metrics
         acc = get_metrics(y_hat, y, metric="accuracy")
@@ -118,18 +120,21 @@ def run_epoch(dataloader,
 
         if logger is not None:
 
-            logger.add_scalar(f"loss", loss.item(), step)
-            logger.add_scalar(f"accuracy", acc, step)
-            logger.add_scalar(f"specificity", spec.mean(), step)
-            logger.add_scalar(f"precision", prec.mean(), step)
-            logger.add_scalar(f"recall", rec.mean(), step)
-            logger.add_scalar(f"f1", f1.mean(), step)
+            logger.add_scalar(f"batch/loss", loss_val, step)
+            logger.add_scalar(f"batch/accuracy", acc, step)
+            # logger.add_scalar(f"batch/specificity", spec.mean(), step)
+            logger.add_scalar(f"batch/precision", prec.mean(), step)
+            logger.add_scalar(f"batch/recall", rec.mean(), step)
+            logger.add_scalar(f"batch/f1", f1.mean(), step)
+
+            logger.add_scalar("gpu/memory_allocated", torch.cuda.memory_allocated()/1024**2, step)
+            logger.add_scalar("gpu/memory_cache", torch.cuda.memory_reserved()/1024**2, step)
 
             for j in range(n_classes):
-                logger.add_scalar(f"precision/{j}", prec[j], step)
-                logger.add_scalar(f"recall/{j}", rec[j], step)
-                logger.add_scalar(f"f1/{j}", f1[j], step)
-                logger.add_scalar(f"specificity/{j}", spec[j], step)
+                logger.add_scalar(f"{j}/batch/precision", prec[j], step)
+                logger.add_scalar(f"{j}/batch/recall", rec[j], step)
+                logger.add_scalar(f"{j}/batch/f1", f1[j], step)
+                # logger.add_scalar(f"{j}/specificity", spec[j], step)
 
             step += 1
 
