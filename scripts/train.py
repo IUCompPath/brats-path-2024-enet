@@ -1,20 +1,13 @@
 import os
 import argparse
-import pickle
 
 # Torch Imports
 import torch
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-import torch.nn as nn
-import torch.optim as optim
-from efficientnet_pytorch import EfficientNet
-from torchvision.transforms import v2
 
 # Local Imports
-import constants as C
-from dataset import GBMPathDataset
-from utility import run_epoch, plot_cm, EarlyStopping
+from train_utils import run_epoch, plot_cm, EarlyStopping
+import core_utils as Util
 
 if __name__ == '__main__':
     # Get arguments
@@ -27,7 +20,7 @@ if __name__ == '__main__':
                         type=int)
     parser.add_argument('--transforms',
                         help = 'set if use transforms',
-                        default=True,
+                        default=False,
                         action='store_true')
     parser.add_argument('--enet_model',
                         help = 'Efficient Net Model to be used',
@@ -45,6 +38,20 @@ if __name__ == '__main__':
                         help='Image Size',
                         default=(512, 512),
                         type=tuple)
+    parser.add_argument('--loss',
+                        help='Loss Function',
+                        default="ce",
+                        type=str)
+    parser.add_argument('--opt',
+                        help='Optimizer',
+                        default="adam",
+                        choices=["adam", "sgd"],
+                        type=str)
+    parser.add_argument('--lrs',
+                        help='Learning Rate Scheduler',
+                        default="step",
+                        choices=["step", "multistep", "exp"],
+                        type=str)
     parser.add_argument('--lr',
                         help='Learning Rate',
                         default=1e-4,
@@ -53,22 +60,27 @@ if __name__ == '__main__':
                         help='Lambda/Momentum',
                         default=1e-4,
                         type=float)
+    parser.add_argument('--gamma',
+                        help='Learning Rate Reduction Factor',
+                        default=0.5,
+                        type=float)
     parser.add_argument('--early_stop',
                         help='Early Stopping- set if true',
-                        default=True,
+                        default=False,
                         action='store_true')
     parser.add_argument("--patience",
                         help='Early Stopping Patience',
-                        default=5,
+                        default=10,
                         type=int)
     args = parser.parse_args()
 
-with open(f'run_args/{args.run_id}_args.pkl', 'wb') as f:
-    pickle.dump(args.__dict__, f)
+Util.save_args(args)
 
-CKPT_PATH = os.path.join("./checkpoints/", f'{args.run_id}')
-LOG_PATH = os.path.join("./logs", f'{args.run_id}')
-PLOTS_PATH = f"./plots/{args.run_id}"
+run_id = args.run_id
+
+CKPT_PATH = os.path.join("./checkpoints/", f'{run_id}')
+LOG_PATH = os.path.join("./logs", f'{run_id}')
+PLOTS_PATH = f"./plots/{run_id}"
 
 os.makedirs(CKPT_PATH, exist_ok=True)
 
@@ -78,65 +90,17 @@ val_logger = SummaryWriter(log_dir=os.path.join(LOG_PATH, "val"))
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-CLASS_COUNTS = []
-for cls in C.CLASS_NAMES:
-    class_path = os.path.join(C.IMAGES_PATH_PREFIX, cls)
-    count = len(os.listdir(class_path))
-    CLASS_COUNTS.append(count)
-
-total_samples = sum(CLASS_COUNTS)
-class_weights = [total_samples / count for count in CLASS_COUNTS]
-class_weights = torch.tensor(class_weights, dtype=torch.float)
+class_weights = Util.get_class_weights()
 class_weights = class_weights.to(device)
-# Define weighted cross-entropy loss
-loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+loss_fn = Util.get_loss_fn(args, class_weights)
 
-model = EfficientNet.from_pretrained(f'efficientnet-b{args.enet_model}', num_classes=C.N_CLASSES)
-opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.lmbda)
+model = Util.get_model(args)
+opt = Util.get_opt(args, model)
+scheduler = Util.get_scheduler(args, opt)
 
 model = model.to(device)
 
-# Load train data
-if args.transforms:
-    train_transforms = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(size=args.image_size),
-        v2.RandomRotation(degrees=20),
-        v2.RandomHorizontalFlip(),
-        v2.RandomVerticalFlip(),
-        v2.ColorJitter(brightness=0.1, contrast=0.1),
-        v2.ToDtype(torch.float, scale=True),
-    ])
-else:
-    train_transforms = v2.Compose([
-        v2.ToImage(),
-        v2.Resize(size=args.image_size),
-        v2.ToDtype(torch.float, scale=True),
-    ])
-train_dataset = GBMPathDataset(
-    imgs_path_file=C.TRAIN_IMAGES_PATHS,
-    func="train",
-    transforms=train_transforms,
-)
-train_dataloader = DataLoader(train_dataset,
-                            batch_size=args.batch_size,
-                            shuffle=True,
-                            num_workers=2)
-
-# Load validation data
-val_transforms = v2.Compose([
-    v2.ToImage(),
-    v2.Resize(size=args.image_size),
-    v2.ToDtype(torch.float, scale=True),
-])
-val_dataset = GBMPathDataset(
-    imgs_path_file=C.VAL_IMAGES_PATHS,
-    func="val",
-    transforms=val_transforms)
-val_dataloader = DataLoader(val_dataset,
-                            batch_size=args.batch_size,
-                            shuffle=True,
-                            num_workers=2)
+train_dataloader, val_dataloader = Util.create_dataloader(args)
 
 # Logging model graph
 x, _ = next(iter(train_dataloader))
@@ -175,71 +139,22 @@ for i in range(args.n_epochs):
         step=i*len(val_dataloader)
     )
 
-    print(f"Epoch {i}:")
-    print(
-        f"Train: Loss - {train_metrics[0]}, " +
-        f"Accuracy - {train_metrics[1]}, " +
-        f"Specificity - {train_metrics[2].mean()}, " +
-        f"Precision - {train_metrics[3].mean()}, " +
-        f"Recall - {train_metrics[4].mean()}, " +
-        f"F1 - {train_metrics[5].mean()}"
-    )
+    scheduler.step()
 
-    print(
-        f"Val: Loss - {val_metrics[0]}, " +
-        f"Accuracy - {val_metrics[1]}, " +
-        f"Specificity - {val_metrics[2].mean()}, " +
-        f"Precision - {val_metrics[3].mean()}, " +
-        f"Recall - {val_metrics[4].mean()}, " +
-        f"F1 - {val_metrics[5].mean()}"
-    )
-
-    # Logging per epoch so that traning and val can be compared properly
-    # Because of equal no. of data points on the graph
-
-    train_logger.add_scalar(f"epoch/loss", train_metrics[0], i)
-    train_logger.add_scalar(f"epoch/accuracy", train_metrics[1], i)
-    # train_logger.add_scalar(f"epoch/specificity", train_metrics[2].mean(), i)
-    train_logger.add_scalar(f"epoch/precision", train_metrics[3].mean(), i)
-    train_logger.add_scalar(f"epoch/recall", train_metrics[4].mean(), i)
-    train_logger.add_scalar(f"epoch/f1", train_metrics[5].mean(), i)
-
-    val_logger.add_scalar(f"epoch/loss", val_metrics[0], i)
-    val_logger.add_scalar(f"epoch/accuracy", val_metrics[1], i)
-    # val_logger.add_scalar(f"epoch/specificity", val_metrics[2].mean(), i)
-    val_logger.add_scalar(f"epoch/precision", val_metrics[3].mean(), i)
-    val_logger.add_scalar(f"epoch/recall", val_metrics[4].mean(), i)
-    val_logger.add_scalar(f"epoch/f1", val_metrics[5].mean(), i)
-
-    for j in range(C.N_CLASSES):
-        print(
-            f"Val metrics for Class: {j}\n\t" +
-            f"Precision - {val_metrics[3][j]}, " +
-            f"Recall - {val_metrics[4][j]}, " +
-            f"F1 - {val_metrics[5][j]}, "
-            # f"Specificity - {val_metrics[2][j]}"
-        )
-
-        train_logger.add_scalar(f"{j}/epoch/precision", train_metrics[3][j], i)
-        train_logger.add_scalar(f"{j}/epoch/recall", train_metrics[4][j], i)
-        train_logger.add_scalar(f"{j}/epoch/f1", train_metrics[5][j], i)
-        # train_logger.add_scalar(f"{j}/epoch/specificity/{j}", train_metrics[2][j], i)
-
-        val_logger.add_scalar(f"{j}/epoch/precision", val_metrics[3][j], i)
-        val_logger.add_scalar(f"{j}/epoch/recall", val_metrics[4][j], i)
-        val_logger.add_scalar(f"{j}/epoch/f1", val_metrics[5][j], i)
-        # val_logger.add_scalar(f"{j}/epoch/specificity", val_metrics[2][j], i)
+    Util.print_metrics(train_metrics, val_metrics, i)
+    Util.log_values(train_logger, train_metrics, val_logger, val_metrics, i)
 
     # Check early stopping criteria
     if args.early_stop:
-        early_stopping(val_metrics[5].mean(), model)
+        early_stopping(val_metrics[0].mean(), model)
 
         if early_stopping.early_stop:
             print(f"Early stopping at epoch {i}")
             print(f"Model weights saved")
             break
 
-    torch.save(model.state_dict(), os.path.join(CKPT_PATH, f"checkpoint{i}.pt"))
+    Util.save_model(model, CKPT_PATH, i)
 
-plot_cm(val_metrics[6], PLOTS_PATH, "val.png")
-plot_cm(train_metrics[6], PLOTS_PATH, "train.png")
+    if i % 5 == 0:
+        plot_cm(val_metrics[6], PLOTS_PATH, f"val_{i}.png")
+        plot_cm(train_metrics[6], PLOTS_PATH, f"train_{i}.png")
