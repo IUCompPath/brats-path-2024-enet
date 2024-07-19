@@ -39,7 +39,7 @@ def get_model(args):
 def get_opt(args, model):
     if args.opt == "adam":
         opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.lmbda)
-    if args.opt == "sgd":
+    elif args.opt == "sgd":
         opt = optim.SGD(model.parameters(), lr=args.lr, weight_decay=args.lmbda)
     return opt
 
@@ -49,13 +49,15 @@ def get_scheduler(args, opt):
         scheduler = LRS.StepLR(opt,
                             step_size = 10,
                             gamma = args.gamma)
-    if lrs == "multistep":
+    elif lrs == "multistep":
         scheduler = LRS.MultiStepLR(opt,
                                     milestones = [15, 20, 25, 30],
                                     gamma = args.gamma)
-    if lrs == "exp":
+    elif lrs == "exp":
         scheduler = LRS.ExponentialLR(opt,
                                       gamma = args.gamma)
+    else:
+        scheduler = None
     return scheduler
 
 def create_dataloader(args):

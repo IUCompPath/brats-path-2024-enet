@@ -49,8 +49,8 @@ if __name__ == '__main__':
                         type=str)
     parser.add_argument('--lrs',
                         help='Learning Rate Scheduler',
-                        default="step",
-                        choices=["step", "multistep", "exp"],
+                        default=None,
+                        choices=["step", "multistep", "exp", None],
                         type=str)
     parser.add_argument('--lr',
                         help='Learning Rate',
@@ -138,8 +138,8 @@ for i in range(args.n_epochs):
         val_logger,
         step=i*len(val_dataloader)
     )
-
-    scheduler.step()
+    if scheduler != None:
+        scheduler.step()
 
     Util.print_metrics(train_metrics, val_metrics, i)
     Util.log_values(train_logger, train_metrics, val_logger, val_metrics, i)
