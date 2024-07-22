@@ -11,8 +11,7 @@ from torchvision.transforms import v2
 from efficientnet_pytorch import EfficientNet
 
 # Local Imports
-from scripts.dataset import GBMPathDataset
-from utility import run_epoch
+from dataset import GBMPathDataset
 import constants as C
 
 if __name__ == '__main__':
@@ -24,10 +23,10 @@ if __name__ == '__main__':
                         help='Exp No.',
                         default=0,
                         type=int)
-    parser.add_argument('--run_file',
-                        help = 'Path to pickle file with arguments',
-                        default=7,
-                        type=int)
+    # parser.add_argument('--run_file',
+    #                     help = 'Path to pickle file with arguments',
+    #                     default=7,
+    #                     type=int)
     parser.add_argument('--chkpt_file',
                         help='Checkpoint File Name',
                         default="checkpoint.pt",
@@ -42,7 +41,7 @@ if __name__ == '__main__':
                         type=tuple)
     args = parser.parse_args()
 
-with open(args.run_file, 'rb') as f:
+with open(f"run_args/{args.run_id}_args.pkl", 'rb') as f:
     model_dict = pickle.load(f)
 
 def run_epoch(dataloader,
@@ -72,13 +71,14 @@ def run_epoch(dataloader,
 # Load Test data
 test_transforms = v2.Compose([
     v2.ToImage(),
-    v2.Resize(size=model_dict["image_size"]),
+    v2.Resize(size=model_dict.image_size),
     v2.ToDtype(torch.float, scale=True),
 ])
 
 test_dataset = GBMPathDataset(
     imgs_path_file=C.TEST_IMAGES_PATHS,
-    transforms=test_transforms
+    transforms=test_transforms,
+    func="test"
 )
 
 test_dataloader = DataLoader(
@@ -87,7 +87,7 @@ test_dataloader = DataLoader(
     shuffle=False
 )
 
-model = EfficientNet.from_name(f'efficientnet-b{model_dict["enet_model"]}', num_classes=C.N_CLASSES)
+model = EfficientNet.from_name(f'efficientnet-b{model_dict.enet_model}', num_classes=C.N_CLASSES)
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 # Load model

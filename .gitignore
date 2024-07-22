@@ -16,3 +16,5 @@
 events.*
 scripts/extra
 dummy*
+job_scripts
+run_file.sh
