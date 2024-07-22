@@ -1,7 +1,6 @@
 from PIL import Image
 from torch.utils.data import Dataset
 import pickle
-import numpy as np
 
 class GBMPathDataset(Dataset):
     def __init__(

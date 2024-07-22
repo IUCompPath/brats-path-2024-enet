@@ -2,11 +2,12 @@ import argparse
 from tqdm import tqdm
 import pandas as pd
 import pickle
+import os
 
 # Torch Imports
 import torch
 from torch.utils.data import DataLoader
-import torch.nn.functional as nn
+# import torch.nn.functional as nn
 from torchvision.transforms import v2
 from efficientnet_pytorch import EfficientNet
 
@@ -23,10 +24,6 @@ if __name__ == '__main__':
                         help='Exp No.',
                         default=0,
                         type=int)
-    # parser.add_argument('--run_file',
-    #                     help = 'Path to pickle file with arguments',
-    #                     default=7,
-    #                     type=int)
     parser.add_argument('--chkpt_file',
                         help='Checkpoint File Name',
                         default="checkpoint.pt",
@@ -38,11 +35,13 @@ if __name__ == '__main__':
     parser.add_argument('--csv_path',
                         help='Predictions CSV Path',
                         default="./predictions_csv",
-                        type=tuple)
+                        type=str)
     args = parser.parse_args()
 
 with open(f"run_args/{args.run_id}_args.pkl", 'rb') as f:
     model_dict = pickle.load(f)
+
+os.makedirs(args.csv_path, exist_ok=True)
 
 def run_epoch(dataloader,
               model,
@@ -58,12 +57,13 @@ def run_epoch(dataloader,
 
         # Running forward propagation
         y_hat = model(x)
+        y_hat = y_hat.cpu()
 
-        prob = nn.softmax(y_hat, dim=1)
-        _, pred_class = torch.max(prob, dim=1)
+        prob = torch.softmax(y_hat, dim=1)
+        pred_class = torch.argmax(prob, dim=1)
 
         path_list.extend(path)
-        pred_list.extend(pred_class)
+        pred_list.extend(pred_class.tolist())
 
     return path_list, pred_list
 
