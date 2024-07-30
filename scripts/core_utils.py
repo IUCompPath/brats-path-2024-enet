@@ -9,6 +9,8 @@ import torch.optim.lr_scheduler as LRS
 from torchvision.transforms import v2
 from dataset import GBMPathDataset
 from torch.utils.data import DataLoader
+from densenet import DenseNetClassifier
+from resnet import ResNet18Classifier, ResNet34Classifier, ResNet50Classifier
 
 def save_args(args):
     with open(f'run_args/{args.run_id}_args.pkl', 'wb') as f:
@@ -22,7 +24,8 @@ def get_class_weights():
         CLASS_COUNTS.append(count)
 
     total_samples = sum(CLASS_COUNTS)
-    class_weights = [total_samples / count for count in CLASS_COUNTS]
+    CLASS_COUNTS_NEW = [6 * count for count in CLASS_COUNTS]
+    class_weights = [total_samples / count for count in CLASS_COUNTS_NEW]
     class_weights = torch.tensor(class_weights, dtype=torch.float)
 
     return class_weights
@@ -33,7 +36,16 @@ def get_loss_fn(args, class_weights):
     return loss_fn
 
 def get_model(args):
-    model = EfficientNet.from_pretrained(f'efficientnet-b{args.enet_model}', num_classes=C.N_CLASSES)
+    if args.model <= 7:
+        model = EfficientNet.from_pretrained(f'efficientnet-b{args.model}', num_classes=C.N_CLASSES)
+    elif args.model == 8:
+        model = DenseNetClassifier()
+    elif args.model == 9:
+        model = ResNet18Classifier()
+    elif args.model == 10:
+        model = ResNet34Classifier()
+    elif args.model == 11:
+        model = ResNet50Classifier()
     return model
 
 def get_opt(args, model):
@@ -51,7 +63,7 @@ def get_scheduler(args, opt):
                             gamma = args.gamma)
     elif lrs == "multistep":
         scheduler = LRS.MultiStepLR(opt,
-                                    milestones = [15, 20, 25, 30],
+                                    milestones = [15, 20, 25, 30, 35, 40, 45],
                                     gamma = args.gamma)
     elif lrs == "exp":
         scheduler = LRS.ExponentialLR(opt,
