@@ -30,7 +30,7 @@ class GBMPathDataset(Dataset):
 
         for path in all_paths:
             if self.func != "test":
-                class_name = path.split("_")[1]
+                class_name = path.split("_")[-2]
                 self.data.append((path, class_name))
             else:
                 self.data.append((path))

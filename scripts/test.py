@@ -3,6 +3,7 @@ from tqdm import tqdm
 import pandas as pd
 import pickle
 import os
+import gc
 
 # Torch Imports
 import torch
@@ -13,7 +14,9 @@ from efficientnet_pytorch import EfficientNet
 
 # Local Imports
 from dataset import GBMPathDataset
+from densenet import DenseNetClassifier
 import constants as C
+from core_utils import get_model
 
 if __name__ == '__main__':
     # Get arguments
@@ -24,10 +27,10 @@ if __name__ == '__main__':
                         help='Exp No.',
                         default=0,
                         type=int)
-    parser.add_argument('--chkpt_file',
-                        help='Checkpoint File Name',
-                        default="checkpoint.pt",
-                        type=str)
+    parser.add_argument('--chkpt',
+                        help='Checkpoint Number',
+                        default="20",
+                        type=int)
     parser.add_argument("--batch_size",
                         help='Batch Size',
                         default=32,
@@ -65,6 +68,9 @@ def run_epoch(dataloader,
         path_list.extend(path)
         pred_list.extend(pred_class.tolist())
 
+        del x, y_hat, prob, pred_class
+        gc.collect()
+
     return path_list, pred_list
 
 
@@ -84,14 +90,16 @@ test_dataset = GBMPathDataset(
 test_dataloader = DataLoader(
     test_dataset,
     batch_size=args.batch_size,
-    shuffle=False
+    shuffle=False,
+    num_workers=2
 )
 
-model = EfficientNet.from_name(f'efficientnet-b{model_dict.enet_model}', num_classes=C.N_CLASSES)
+model = get_model(model_dict)
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 # Load model
-CHECKPOINT_PATH = f"./checkpoints/{args.run_id}/{args.chkpt_file}"
+CHECKPOINT_PATH = f"./checkpoints/{args.run_id}/checkpoint{args.chkpt}.pt"
 checkpoint = torch.load(CHECKPOINT_PATH)
 # Load pre-trained weights
 model.load_state_dict(checkpoint)
@@ -111,4 +119,4 @@ pred_df = pd.DataFrame(
      'Prediction': pred_list
     })
 
-pred_df.to_csv(f'{args.csv_path}/{args.run_id}_test_preds.csv', encoding='utf-8', index=False)
+pred_df.to_csv(f'{args.csv_path}/{args.run_id}-{args.chkpt}_preds.csv', encoding='utf-8', index=False)

@@ -4,6 +4,7 @@ import argparse
 # Torch Imports
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from transformers import AutoImageProcessor
 
 # Local Imports
 from train_utils import run_epoch, plot_cm, EarlyStopping
@@ -22,8 +23,8 @@ if __name__ == '__main__':
                         help = 'set if use transforms',
                         default=False,
                         action='store_true')
-    parser.add_argument('--enet_model',
-                        help = 'Efficient Net Model to be used',
+    parser.add_argument('--model',
+                        help = 'Model to be used. 0-7 are efficient net models, 8 is densenet, 9 is resnet18, 10 is resnet34, 11 is resnet50',
                         default=4,
                         type=int)
     parser.add_argument("--batch_size",
@@ -34,10 +35,6 @@ if __name__ == '__main__':
                         help='Number of epochs',
                         default=50,
                         type=int)
-    parser.add_argument('--image_size',
-                        help='Image Size',
-                        default=(512, 512),
-                        type=tuple)
     parser.add_argument('--loss',
                         help='Loss Function',
                         default="ce",
@@ -62,7 +59,7 @@ if __name__ == '__main__':
                         type=float)
     parser.add_argument('--gamma',
                         help='Learning Rate Reduction Factor',
-                        default=0.5,
+                        default=0.9,
                         type=float)
     parser.add_argument('--early_stop',
                         help='Early Stopping- set if true',
@@ -73,6 +70,11 @@ if __name__ == '__main__':
                         default=10,
                         type=int)
     args = parser.parse_args()
+
+    if args.model <= 7:
+        args.image_size = (512, 512)
+    else:
+        args.image_size = (224, 224)
 
 Util.save_args(args)
 
@@ -155,6 +157,5 @@ for i in range(args.n_epochs):
 
     Util.save_model(model, CKPT_PATH, i)
 
-    if i % 5 == 0:
-        plot_cm(val_metrics[6], PLOTS_PATH, f"val_{i}.png")
-        plot_cm(train_metrics[6], PLOTS_PATH, f"train_{i}.png")
+    plot_cm(val_metrics[6], PLOTS_PATH, f"val_{i}.png")
+    plot_cm(train_metrics[6], PLOTS_PATH, f"train_{i}.png")

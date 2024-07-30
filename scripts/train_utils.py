@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 import constants as C
+import numpy as np
 
 # Early stopping
 class EarlyStopping:
@@ -36,9 +37,20 @@ class EarlyStopping:
         self.f1_max = f1
 
 def plot_cm(cm, path, file_name):
+    # Normalize
+    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+
+    # String matrix with both raw and normalized values
+    annot = np.empty_like(cm).astype(str)
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            raw_value = cm[i, j]
+            norm_value = cm_normalized[i, j]
+            annot[i, j] = f'{raw_value}\n({norm_value:.2f})'
+
     # Plot Confusion Matrix
-    plt.figure(figsize=(8, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=C.CLASS_NAMES, yticklabels=C.CLASS_NAMES)
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm_normalized, annot=annot, fmt='', cmap='Blues', xticklabels=C.CLASS_NAMES, yticklabels=C.CLASS_NAMES)
     plt.xlabel('Predicted')
     plt.ylabel('True')
     plt.title('Confusion Matrix')
@@ -55,7 +67,7 @@ def run_epoch(dataloader,
               loss_fn,
               logger=None,
               opt=None,
-              n_classes=5,
+              n_classes=6,
               step=0):
 
     loss_list = []
