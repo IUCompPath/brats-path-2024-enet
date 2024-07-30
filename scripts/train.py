@@ -4,7 +4,6 @@ import argparse
 # Torch Imports
 import torch
 from torch.utils.tensorboard import SummaryWriter
-from transformers import AutoImageProcessor
 
 # Local Imports
 from train_utils import run_epoch, plot_cm, EarlyStopping

@@ -10,11 +10,9 @@ import torch
 from torch.utils.data import DataLoader
 # import torch.nn.functional as nn
 from torchvision.transforms import v2
-from efficientnet_pytorch import EfficientNet
 
 # Local Imports
 from dataset import GBMPathDataset
-from densenet import DenseNetClassifier
 import constants as C
 from core_utils import get_model
 
