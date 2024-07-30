@@ -1,15 +1,20 @@
-import argparse
-from scripts.core_utils import create_paths_list
+import pickle
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='This script trains the model'
-    )
-    parser.add_argument('--path',
-                        help='path',
-                        default="./data-split/val",
-                        type=str)
+imgs_path_file = './image_paths/all_fold_paths.pkl'
 
-    args = parser.parse_args()
+data = []
 
-create_paths_list(args.__dict__)
+with open(imgs_path_file, 'rb') as fp:
+    all_fold_paths = pickle.load(fp)
+
+all_folds = [1, 2, 3, 4, 5]
+selec_folds = [x for x in all_folds if x != 3]
+
+for selec_fold in selec_folds:
+    paths = all_fold_paths[selec_fold]
+
+    for path in paths:
+        class_name = path.split("_")[-2]
+        data.append((path, class_name))
+    print(data)
+    break

@@ -13,7 +13,7 @@ from densenet import DenseNetClassifier
 from resnet import ResNet18Classifier, ResNet34Classifier, ResNet50Classifier
 
 def save_args(args):
-    with open(f'run_args/{args.run_id}_args.pkl', 'wb') as f:
+    with open(f'cv/run_args/{args.run_id}_args.pkl', 'wb') as f:
         pickle.dump(args, f)
 
 def get_class_weights():
