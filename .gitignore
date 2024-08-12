@@ -18,3 +18,7 @@ scripts/extra
 dummy*
 job_scripts
 run_file.sh
+/test
+/ml-cube-brats
+/model.tar.gz
+*.pyc
