@@ -1,5 +1,6 @@
 /.vscode
-/notes
+*.xlsx
+*.docx
 /__pycache__
 /dataset
 /data-split
@@ -22,3 +23,4 @@ run_file.sh
 /ml-cube-brats
 /model.tar.gz
 *.pyc
+~*
