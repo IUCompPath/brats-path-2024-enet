@@ -35,13 +35,13 @@ class GBMPathDataset(Dataset):
             for selec_fold in selec_folds:
                 paths = all_paths[selec_fold]
                 for path in paths:
-                    class_name = path.split("_")[-2]
+                    class_name = path.split("/")[-2]
                     self.data.append((path, class_name))
 
         elif self.func  == "val":
             paths = all_paths[fold]
             for path in paths:
-                class_name = path.split("_")[-2]
+                class_name = path.split("/")[-2]
                 self.data.append((path, class_name))
 
         elif self.func == "test":
